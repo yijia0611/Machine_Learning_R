@@ -1,0 +1,61 @@
+# prepare the packages 
+library(tidyverse)
+library(lmtest)
+library(sandwich)
+library(haven)
+library(stargazer)
+library(caret)
+library(grid)
+library(glmnet)
+library(rpart)
+library(rpart.plot)
+library (gbm)
+library(randomForest)
+
+
+install.packages("wooldridge") 
+data<-data(gpa2, package="wooldridge")
+# Define quadratic, cubic and fourth order terms of tothrs, colgpa, hsize, hsrank and hsperc
+gpa2$tothr2<-gpa2$tothrs^2
+gpa2$tothr3<-gpa2$tothrs^3
+gpa2$tothr4<-gpa2$tothrs^4
+gpa2$colgpa2<-gpa2$colgpa^2
+gpa2$colgpa3<-gpa2$colgpa^3
+gpa2$colgpa4<-gpa2$colgpa^4
+gpa2$hsize2<-gpa2$hsize^2
+gpa2$hsize3<-gpa2$hsize^3
+gpa2$hsize4<-gpa2$hsize^4
+gpa2$hsrank2<-gpa2$hsrank^2
+gpa2$hsrank3<-gpa2$hsrank^3
+gpa2$hsrank4<-gpa2$hsrank^4
+gpa2$hsperc2<-gpa2$hsperc^2
+gpa2$hsperc3<-gpa2$hsperc^3
+gpa2$hsperc4<-gpa2$hsperc^4
+gpa2[1,]
+#define interaction of white and female
+gpa2$whitefemale<-gpa2$female*gpa2$white
+
+#b estimate LASSO models with various lambda of a sufficiently wide range.
+X <- model.matrix(sat ~.,gpa2)[, -1] # predictor variables excluding wage, total credits and ids  in training set
+y <- gpa2$sat # response variable in training set
+set.seed(123) # for reproducibility
+lambda_seq <- 10^seq(-5, 1, by = 0.5) # sequence of lambda values
+lasso_models<-glmnet(X, y, alpha = 1)
+
+#c use cv to determine best lambda, and write down the best lambda
+cv_results <- cv.glmnet(X, y, alpha = 1, lambda = lambda_seq,nfolds = 5)
+best_lambda <- cv_results$lambda.min
+best_lambda
+#d 
+# way 1 
+cvMSE <- cv_results$cvm[which.min(cv_results$lambda)]
+
+#way 2
+lasso.pred <- predict(cv_results, s = best_lambda,newx = X)
+mean((lasso.pred - y)^2)
+
+##f
+lasso_coef <- coef(cv_results, s = best_lambda)
+lasso_vars <- rownames(lasso_coef)[-1]
+lasso_coef
+lasso_vars
